@@ -41,5 +41,4 @@ class UserOpenApiAdapter(
             ),
             "로그인되었습니다."
         )
-
 }
