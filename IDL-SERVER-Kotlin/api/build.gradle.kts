@@ -1,14 +1,15 @@
 plugins {
 	kotlin("jvm") version "1.9.25"
 	kotlin("plugin.spring") version "1.9.25"
-	war
-	id("org.springframework.boot") version "3.5.10"
+	kotlin("plugin.jpa") version "1.9.25"
+	id("org.springframework.boot") version "3.4.0"
 	id("io.spring.dependency-management") version "1.1.7"
 }
 
 group = "com.ldl"
 version = "0.0.1-SNAPSHOT"
 description = "Demo project for Spring Boot"
+val queryDslVersion = "5.1.0"
 
 java {
 	toolchain {
@@ -22,13 +23,25 @@ repositories {
 
 dependencies {
 	implementation("io.github.seob7:common-api:0.0.2")
+
+	// Ktor Client (논블로킹 HTTP)
+	implementation("io.ktor:ktor-client-cio:2.3.6")
+
+	// Ktor JSON Serialization
+	implementation("io.ktor:ktor-client-content-negotiation:2.3.13")
+	implementation("io.ktor:ktor-serialization-jackson:2.3.13")
+
+	// Mongo
+	implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
+
+	// OpenFeign
+	implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+
+	// Web
 	implementation("org.springframework.boot:spring-boot-starter-web")
-	implementation("org.jetbrains.kotlin:kotlin-reflect")
-	providedRuntime("org.springframework.boot:spring-boot-starter-tomcat")
-	testImplementation("org.springframework.boot:spring-boot-starter-test")
-	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-	implementation("org.springframework.boot:spring-boot-starter-validation")
+
+	// Jsoup (Crawler)
+	implementation("org.jsoup:jsoup:1.21.2")
 
 	// Security
 	implementation("org.springframework.boot:spring-boot-starter-security")
@@ -37,6 +50,49 @@ dependencies {
 	implementation("io.jsonwebtoken:jjwt-api:0.12.6")
 	implementation("io.jsonwebtoken:jjwt-impl:0.12.6")
 	implementation("io.jsonwebtoken:jjwt-jackson:0.12.6")
+
+	// Kotlin
+	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+	implementation("org.jetbrains.kotlin:kotlin-reflect")
+
+	// Coroutine
+	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.7.3")
+
+	// Validation
+	implementation("org.springframework.boot:spring-boot-starter-validation")
+
+	// Swagger
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9")
+
+	// Lombok
+	compileOnly("org.projectlombok:lombok")
+	annotationProcessor("org.projectlombok:lombok")
+
+	implementation(project(":global"))
+	// 추후에 해야 할 task: reading-room 모듈 분리 구현
+	//	implementation(project(":reading-room"))
+
+	// Prometheus
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+
+	// QueryDSL
+	implementation("com.querydsl:querydsl-mongodb:${queryDslVersion}") {
+		exclude(group = "org.mongodb", module = "mongo-java-driver")
+	}
+	annotationProcessor("com.querydsl:querydsl-apt:${queryDslVersion}:general")
+	annotationProcessor("jakarta.annotation:jakarta.annotation-api")
+	annotationProcessor("jakarta.persistence:jakarta.persistence-api")
+
+	testImplementation("org.springframework.boot:spring-boot-starter-test")
+//    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+//    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+	// Kotest
+	testImplementation("io.kotest:kotest-runner-junit5-jvm:5.9.1")
+	testImplementation("io.kotest:kotest-assertions-core-jvm:5.9.1")
+	testImplementation("io.mockk:mockk:1.14.5")
 }
 
 kotlin {
@@ -45,6 +101,39 @@ kotlin {
 	}
 }
 
+allOpen {
+	annotation("jakarta.persistence.Entity")
+	annotation("jakarta.persistence.MappedSuperclass")
+	annotation("jakarta.persistence.Embeddable")
+}
+
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+tasks.getByName<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+	enabled = true
+}
+
+tasks.getByName<Jar>("jar") {
+	enabled = false
+}
+
+val querydslDir = "src/main/generated"
+
+sourceSets {
+	getByName("main").java.srcDirs(querydslDir)
+}
+
+tasks.withType<JavaCompile> {
+	options.generatedSourceOutputDirectory = file(querydslDir)
+
+	// 위의 설정이 안되면 아래 설정 사용
+	// options.generatedSourceOutputDirectory.set(file(querydslDir))
+}
+
+tasks.named("clean") {
+	doLast {
+		file(querydslDir).deleteRecursively()
+	}
 }
